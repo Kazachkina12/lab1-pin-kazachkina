@@ -1,0 +1,121 @@
+stages:
+  - check
+  - lint
+  - test
+  - build
+
+variables:
+  GO_VERSION: "1.22"
+  PYTHON_VERSION: "3.11"
+
+# ============================================
+# 1. Проверка наличия обязательных файлов
+# ============================================
+check-files:
+  stage: check
+  image: alpine:latest
+  script:
+    - |
+      echo "🔍 Проверка структуры проекта..."
+      MISSING=0
+      
+      if [ ! -f "python/hello.py" ]; then
+        echo "❌ Ошибка: Файл python/hello.py не найден"
+        MISSING=1
+      fi
+      
+      if [ ! -f "go/main.go" ]; then
+        echo "❌ Ошибка: Файл go/main.go не найден"
+        MISSING=1
+      fi
+      
+      if [ ! -f ".gitignore" ]; then
+        echo "⚠️ Предупреждение: .gitignore не найден"
+      fi
+      
+      if [ ! -f "README.md" ]; then
+        echo "⚠️ Предупреждение: README.md не найден"
+      fi
+      
+      if [ $MISSING -eq 1 ]; then
+        echo "❌ Проверка не пройдена!"
+        exit 1
+      fi
+      
+      echo "✅ Все обязательные файлы найдены!"
+
+# ============================================
+# 2. Линтинг Python кода
+# ============================================
+lint-python:
+  stage: lint
+  image: python:${PYTHON_VERSION}
+  script:
+    - pip install flake8
+    - echo "🔍 Проверка Python кода..."
+    - flake8 python/hello.py --max-line-length=120 --show-source
+  allow_failure: false
+
+# ============================================
+# 3. Линтинг Go кода
+# ============================================
+lint-go:
+  stage: lint
+  image: golang:${GO_VERSION}
+  script:
+    - cd go
+    - echo "🔍 Проверка Go кода..."
+    - go vet ./...
+    - |
+      if [ -n "$(gofmt -l .)" ]; then
+        echo "❌ Ошибка: файлы не отформатированы через gofmt"
+        echo "Нужно отформатировать:"
+        gofmt -l .
+        exit 1
+      fi
+    - echo "✅ Go код проверен"
+  allow_failure: false
+
+# ============================================
+# 4. Тестирование Python (если есть тесты)
+# ============================================
+test-python:
+  stage: test
+  image: python:${PYTHON_VERSION}
+  script:
+    - pip install pytest
+    - echo "🔍 Запуск тестов Python..."
+    - |
+      if [ -d "test" ] && [ "$(ls -A test/*.py 2>/dev/null)" ]; then
+        pytest test/ -v --tb=short
+      else
+        echo "⚠️ Тесты не найдены, пропускаем..."
+      fi
+  allow_failure: true
+
+# ============================================
+# 5. Проверка сборки Go
+# ============================================
+build-go:
+  stage: build
+  image: golang:${GO_VERSION}
+  script:
+    - cd go
+    - echo "🔍 Сборка Go программы..."
+    - go build -o hello main.go
+    - echo "✅ Go программа собрана успешно"
+    - ./hello
+  allow_failure: false
+
+# ============================================
+# 6. Проверка запуска Python
+# ============================================
+run-python:
+  stage: build
+  image: python:${PYTHON_VERSION}
+  script:
+    - cd python
+    - echo "🔍 Проверка синтаксиса Python..."
+    - python -m py_compile hello.py
+    - echo "✅ Python синтаксис корректен"
+  allow_failure: false
