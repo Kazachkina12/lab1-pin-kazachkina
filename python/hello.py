@@ -29,7 +29,10 @@ def main():
     else:
         color_code = green
 
-    print(f"{color_code}" f"Привет, {name}! Текущее время: {current_time}" f"{reset}")
+    print(
+        f"{color_code}"
+        f"Привет, {name}! Текущее время: {current_time}"
+        f"{reset}")
 
     end_time = time.perf_counter()
     duration_sec = end_time - start_time
